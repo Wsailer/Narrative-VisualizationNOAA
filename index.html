@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NOAA Global Temperature Anomalies</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: white;
+            color: #333;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            text-align: center;
+            padding: 0 0 20px;
+            border-bottom: 1px solid #eee;
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            font-size: 2.4rem;
+            margin-bottom: 5px;
+            color: #222;
+        }
+        
+        .subtitle {
+            font-size: 1.1rem;
+            max-width: 800px;
+            margin: 0 auto;
+            color: #666;
+        }
+        
+        .scene-container {
+            padding: 20px 0;
+            margin: 20px 0;
+        }
+        
+        .scene-title {
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+            color: #222;
+            text-align: center;
+        }
+        
+        .scene-description {
+            font-size: 1rem;
+            margin-bottom: 20px;
+            line-height: 1.7;
+            color: #444;
+            text-align: center;
+            max-width: 800px;
+            margin: 0 auto 30px;
+        }
+        
+        .navigation {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            width: 100%;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        
+        .nav-button {
+            background: black;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            min-width: 120px;
+        }
+        
+        .nav-button:hover:not(:disabled) {
+            background: #333;
+        }
+        
+        .nav-button:disabled {
+            background: #aaa;
+            cursor: not-allowed;
+        }
+        
+        .page-indicator {
+            font-size: 1.1rem;
+            font-weight: 600;
+            padding: 0 20px;
+            color: #444;
+        }
+        
+        .chart-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 20px;
+            min-height: 500px;
+        }
+        
+        .chart-svg {
+            background: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        
+        .axis {
+            font-size: 12px;
+        }
+        
+        .axis-label {
+            font-size: 13px;
+            font-weight: 600;
+            fill: #444;
+        }
+        
+        .data-point {
+            transition: all 0.3s ease;
+            cursor: pointer;
+            opacity: 0.85;
+        }
+        
+        .data-point.interactive:hover {
+            stroke: #333;
+            stroke-width: 2px;
+            r: 6;
+        }
+        
+        .tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 12px;
+            border-radius: 4px;
+            font-size: 13px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 1000;
+            max-width: 250px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .tooltip h3 {
+            margin-bottom: 6px;
+            font-size: 14px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            padding-bottom: 5px;
+        }
+        
+        .tooltip p {
+            margin: 5px 0;
+        }
+        
+        .legend {
+            display: flex;
+            justify-content: center;
+            margin-top: 15px;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            font-size: 0.9rem;
+            color: #666;
+        }
+        
+        .trend-line {
+            stroke: #e74c3c;
+            stroke-width: 2.5;
+            stroke-dasharray: 5, 5;
+            fill: none;
+        }
+        
+        .recent-trend-line {
+            stroke: #e74c3c;
+            stroke-width: 2.5;
+            fill: none;
+        }
+        
+        .trend-label {
+            fill: #e74c3c;
+            font-weight: 600;
+            font-size: 13px;
+        }
+        
+        @media (max-width: 768px) {
+            .navigation {
+                flex-wrap: wrap;
+            }
+            
+            .nav-button {
+                padding: 8px 15px;
+                min-width: 100px;
+            }
+            
+            .page-indicator {
+                margin: 10px 0;
+                width: 100%;
+                text-align: center;
+            }
+            
+            h1 {
+                font-size: 1.8rem;
+            }
+            
+            .subtitle {
+                font-size: 0.95rem;
+            }
+            
+            .scene-title {
+                font-size: 1.3rem;
+            }
+            
+            .scene-description {
+                font-size: 0.95rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>NOAA Global Temperature Anomalies</h1>
+            <p class="subtitle">----------------------------------------------------------------------------</p>
+        </header>
+        
+        <div class="scene-container" id="sceneContainer">
+            <h2 class="scene-title" id="sceneTitle">Historical Context (1880-2024)</h2>
+            <p class="scene-description" id="sceneDescription">This visualization uses NOAA global temperature anomaly data spanning 144 years. The data shows deviations from the long-term average global temperature. Notice the clear warming trend, especially after the 1970s.</p>
+            
+            <div class="chart-area">
+                <svg id="chart" class="chart-svg" width="960" height="500"></svg>
+            </div>
+        </div>
+        
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background: #3498db;"></div>
+                <span>Below Average Temperatures</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #e74c3c;"></div>
+                <span>Above Average Temperatures</span>
+            </div>
+        </div>
+        
+        <div class="tooltip" id="tooltip"></div>
+        
+        <div class="navigation">
+            <button class="nav-button" id="prevBtn">
+                ← Previous
+            </button>
+            <div class="page-indicator" id="pageIndicator">Page 1 of 3</div>
+            <button class="nav-button" id="nextBtn">
+                Next →
+            </button>
+        </div>
+        
+        <div class="footer">
+            <p>Data from NOAA National Centers for Environmental Information</p>
+            <p>Temperature anomalies represent deviations from the 20th century average</p>
+        </div>
+    </div>
+
+    <script>
+        const TempData = [
+            {year: 1880, anomaly: -0.18}, {year: 1881, anomaly: -0.1}, {year: 1882, anomaly: -0.16},
+            {year: 1883, anomaly: -0.19}, {year: 1884, anomaly: -0.29}, {year: 1885, anomaly: -0.28},
+            {year: 1886, anomaly: -0.28}, {year: 1887, anomaly: -0.33}, {year: 1888, anomaly: -0.1},
+            {year: 1889, anomaly: -0.04}, {year: 1890, anomaly: -0.33}, {year: 1891, anomaly: -0.22},
+            {year: 1892, anomaly: -0.26}, {year: 1893, anomaly: -0.33}, {year: 1894, anomaly: -0.32},
+            {year: 1895, anomaly: -0.21}, {year: 1896, anomaly: -0.11}, {year: 1897, anomaly: -0.09},
+            {year: 1898, anomaly: -0.25}, {year: 1899, anomaly: -0.16}, {year: 1900, anomaly: -0.06},
+            {year: 1901, anomaly: -0.11}, {year: 1902, anomaly: -0.22}, {year: 1903, anomaly: -0.36},
+            {year: 1904, anomaly: -0.43}, {year: 1905, anomaly: -0.26}, {year: 1906, anomaly: -0.17},
+            {year: 1907, anomaly: -0.35}, {year: 1908, anomaly: -0.42}, {year: 1909, anomaly: -0.43},
+            {year: 1910, anomaly: -0.37}, {year: 1911, anomaly: -0.4}, {year: 1912, anomaly: -0.33},
+            {year: 1913, anomaly: -0.32}, {year: 1914, anomaly: -0.14}, {year: 1915, anomaly: -0.09},
+            {year: 1916, anomaly: -0.3}, {year: 1917, anomaly: -0.43}, {year: 1918, anomaly: -0.31},
+            {year: 1919, anomaly: -0.23}, {year: 1920, anomaly: -0.23}, {year: 1921, anomaly: -0.17},
+            {year: 1922, anomaly: -0.24}, {year: 1923, anomaly: -0.25}, {year: 1924, anomaly: -0.23},
+            {year: 1925, anomaly: -0.2}, {year: 1926, anomaly: -0.07}, {year: 1927, anomaly: -0.17},
+            {year: 1928, anomaly: -0.16}, {year: 1929, anomaly: -0.32}, {year: 1930, anomaly: -0.11},
+            {year: 1931, anomaly: -0.05}, {year: 1932, anomaly: -0.12}, {year: 1933, anomaly: -0.24},
+            {year: 1934, anomaly: -0.1}, {year: 1935, anomaly: -0.15}, {year: 1936, anomaly: -0.11},
+            {year: 1937, anomaly: -0.01}, {year: 1938, anomaly: 0.01}, {year: 1939, anomaly: 0.02},
+            {year: 1940, anomaly: 0.15}, {year: 1941, anomaly: 0.23}, {year: 1942, anomaly: 0.09},
+            {year: 1943, anomaly: 0.07}, {year: 1944, anomaly: 0.24}, {year: 1945, anomaly: 0.15},
+            {year: 1946, anomaly: -0.03}, {year: 1947, anomaly: 0}, {year: 1948, anomaly: -0.06},
+            {year: 1949, anomaly: -0.06}, {year: 1950, anomaly: -0.13}, {year: 1951, anomaly: -0.03},
+            {year: 1952, anomaly: 0.05}, {year: 1953, anomaly: 0.1}, {year: 1954, anomaly: -0.09},
+            {year: 1955, anomaly: -0.12}, {year: 1956, anomaly: -0.16}, {year: 1957, anomaly: 0.06},
+            {year: 1958, anomaly: 0.1}, {year: 1959, anomaly: 0.08}, {year: 1960, anomaly: 0.01},
+            {year: 1961, anomaly: 0.08}, {year: 1962, anomaly: 0.06}, {year: 1963, anomaly: 0.07},
+            {year: 1964, anomaly: -0.16}, {year: 1965, anomaly: -0.07}, {year: 1966, anomaly: -0.03},
+            {year: 1967, anomaly: 0.01}, {year: 1968, anomaly: -0.05}, {year: 1969, anomaly: 0.1},
+            {year: 1970, anomaly: 0.06}, {year: 1971, anomaly: -0.06}, {year: 1972, anomaly: 0.06},
+            {year: 1973, anomaly: 0.2}, {year: 1974, anomaly: -0.05}, {year: 1975, anomaly: 0.01},
+            {year: 1976, anomaly: -0.05}, {year: 1977, anomaly: 0.2}, {year: 1978, anomaly: 0.11},
+            {year: 1979, anomaly: 0.2}, {year: 1980, anomaly: 0.31}, {year: 1981, anomaly: 0.35},
+            {year: 1982, anomaly: 0.17}, {year: 1983, anomaly: 0.35}, {year: 1984, anomaly: 0.19},
+            {year: 1985, anomaly: 0.16}, {year: 1986, anomaly: 0.23}, {year: 1987, anomaly: 0.34},
+            {year: 1988, anomaly: 0.4}, {year: 1989, anomaly: 0.28}, {year: 1990, anomaly: 0.45},
+            {year: 1991, anomaly: 0.42}, {year: 1992, anomaly: 0.24}, {year: 1993, anomaly: 0.27},
+            {year: 1994, anomaly: 0.33}, {year: 1995, anomaly: 0.48}, {year: 1996, anomaly: 0.35},
+            {year: 1997, anomaly: 0.49}, {year: 1998, anomaly: 0.63}, {year: 1999, anomaly: 0.41},
+            {year: 2000, anomaly: 0.41}, {year: 2001, anomaly: 0.55}, {year: 2002, anomaly: 0.62},
+            {year: 2003, anomaly: 0.63}, {year: 2004, anomaly: 0.56}, {year: 2005, anomaly: 0.69},
+            {year: 2006, anomaly: 0.65}, {year: 2007, anomaly: 0.65}, {year: 2008, anomaly: 0.54},
+            {year: 2009, anomaly: 0.67}, {year: 2010, anomaly: 0.73}, {year: 2011, anomaly: 0.61},
+            {year: 2012, anomaly: 0.66}, {year: 2013, anomaly: 0.68}, {year: 2014, anomaly: 0.76},
+            {year: 2015, anomaly: 0.92}, {year: 2016, anomaly: 1.03}, {year: 2017, anomaly: 0.94},
+            {year: 2018, anomaly: 0.87}, {year: 2019, anomaly: 0.99}, {year: 2020, anomaly: 1.02},
+            {year: 2021, anomaly: 0.87}, {year: 2022, anomaly: 0.9}, {year: 2023, anomaly: 1.19},
+            {year: 2024, anomaly: 1.29}
+        ];
+        
+        let activePa = 1;
+        const numScenes = 3;
+        let dataPoints = [];
+        let longTerm = 0;
+        let shortTerm = 0;
+        
+        const startup = () => {
+            dataPoints = TempData.map(d => {
+                return {
+                    yr: d.year,
+                    temp: d.anomaly,
+                    tempF: d.anomaly * 9/5,
+                    celsiusVal: d.anomaly,
+                    fahrenheitVal: d.anomaly * 9/5
+                };
+            });
+            
+            calcTrend();
+            
+            setButtons();
+            refreshDisp();
+        };
+        
+        const calcTrend = () => {
+            const everything = dataPoints;
+            const count = everything.length;
+            let xSum = 0, ySum = 0, xySum = 0, x2Sum = 0;
+            
+            for (let idx = 0; idx < count; idx++) {
+                const x = everything[idx].yr - 1880;
+                const y = everything[idx].temp;
+                
+                xSum += x;
+                ySum += y;
+                xySum += x * y;
+                x2Sum += x * x;
+            }
+            
+            const slope = (count * xySum - xSum * ySum) / (count * x2Sum - xSum * xSum);
+            longTerm = slope * 10;
+            
+            const since1970 = dataPoints.filter(d => d.yr >= 1970);
+            const recentCount = since1970.length;
+            xSum = 0; ySum = 0; xySum = 0; x2Sum = 0;
+            
+            for (let j = 0; j < recentCount; j++) {
+                const x = since1970[j].yr - 1970;
+                const y = since1970[j].temp;
+                
+                xSum += x;
+                ySum += y;
+                xySum += x * y;
+                x2Sum += x * x;
+            }
+            
+            const recentSlope = (recentCount * xySum - xSum * ySum) / (recentCount * x2Sum - xSum * xSum);
+            shortTerm = recentSlope * 10;
+            
+            sceneInfo[1].text = `This visualization uses NOAA global temperature anomaly data spanning 144 years, capturing periods dominated by natural climate drivers like volcanic eruptions (e.g., Krakatoa 1883) and solar cycles before anthropogenic factors prevailed. The long-term warming trend is ${longTerm.toFixed(2)}°C per decade, while recent warming (since 1970) has accelerated to ${shortTerm.toFixed(2)}°C per decade.`;
+            sceneInfo[2].text = `Focusing on recent decades reveals the dramatic acceleration in warming. 
+The trend line shows warming at ${shortTerm.toFixed(2)}°C per decade—more than twice the long-term rate. 
+This acceleration began after the second industrial revolution, when reductions in atmospheric aerosols like soot 
+(which had cooled Earth by reflecting sunlight) coincided with increased greenhouse gas production. 
+This period provides the clearest evidence of human influence on global climate.
+`;
+        };
+        
+        const sceneInfo = {
+            1: {
+                headline: "Historical Context (1880-2024)",
+                text: "Loading trend data...",
+                mode: "overview"
+            },
+            2: {
+                headline: "Accelerated Warming (1970-Present)", 
+                text: "Loading trend data...",
+                mode: "focused"
+            },
+            3: {
+                headline: "Interactive Data Exploration",
+                text: "Explore the NOAA temperature records! Hover over data points to see detailed information in both Celsius and Fahrenheit.",
+                mode: "interactive"
+            }
+        };
+        
+        const padding = { top: 50, right: 80, bottom: 70, left: 70 };
+        const plotWidth = 800;
+        const plotHeight = 500;
+        
+        const drawVis = () => {
+            const scene = sceneInfo[activePa];
+            
+            d3.select("#chart").html("");
+            
+            const svg = d3.select("#chart")
+                .attr("width", plotWidth + padding.left + padding.right)
+                .attr("height", plotHeight + padding.top + padding.bottom);
+            
+            const mainGroup = svg.append("g")
+                .attr("transform", `translate(${padding.left},${padding.top})`);
+            
+            let dataToShow = dataPoints;
+            if (scene.mode === "focused") {
+                dataToShow = dataPoints.filter(d => d.yr >= 1970);
+            }
+            
+            const xScale = d3.scaleLinear()
+                .domain([d3.min(dataToShow, d => d.yr), d3.max(dataToShow, d => d.yr)])
+                .range([0, plotWidth]);
+            
+            const tempMin = d3.min(dataToShow, d => d.temp);
+            const tempMax = d3.max(dataToShow, d => d.temp);
+            
+            const yScale = d3.scaleLinear()
+                .domain([Math.min(tempMin - 0.5, 0), Math.max(tempMax + 0.5, 0.5)])
+                .range([plotHeight, 0]);
+            
+            mainGroup.append("g")
+                .attr("class", "axis")
+                .attr("transform", `translate(0,${plotHeight})`)
+                .call(d3.axisBottom(xScale).ticks(15));
+            
+            mainGroup.append("g")
+                .attr("class", "axis")
+                .call(d3.axisLeft(yScale).ticks(8));
+            
+            mainGroup.append("text")
+                .attr("class", "axis-label")
+                .attr("transform", "rotate(-90)")
+                .attr("y", 0 - padding.left + 15)
+                .attr("x", 0 - (plotHeight / 2))
+                .attr("dy", "1em")
+                .style("text-anchor", "middle")
+                .text("Temperature Anomaly (°C)");
+            
+            mainGroup.append("text")
+                .attr("class", "axis-label")
+                .attr("transform", `translate(${plotWidth / 2}, ${plotHeight + padding.bottom - 15})`)
+                .style("text-anchor", "middle")
+                .text("Year");
+            
+            mainGroup.append("line")
+                .attr("x1", 0)
+                .attr("y1", yScale(0))
+                .attr("x2", plotWidth)
+                .attr("y2", yScale(0))
+                .attr("stroke", "#aaa")
+                .attr("stroke-dasharray", "5,5")
+                .attr("opacity", 0.7);
+            
+            mainGroup.append("text")
+                .attr("x", plotWidth - 40)
+                .attr("y", yScale(0) - 10)
+                .text("Long-term Average")
+                .attr("fill", "#777")
+                .attr("font-size", "12px");
+            
+            if (activePa === 1 || activePa === 2) {
+                const earliestYear = d3.min(dataToShow, d => d.yr);
+                const latestYear = d3.max(dataToShow, d => d.yr);
+                
+                if (activePa === 1) {
+                    const startYear = dataPoints[0].yr;
+                    const endYear = dataPoints[dataPoints.length - 1].yr;
+                    
+                    const startTemp = longTerm * (earliestYear - 1880) / 10;
+                    const endTemp = longTerm * (latestYear - 1880) / 10;
+                    
+                    mainGroup.append("line")
+                        .attr("x1", xScale(earliestYear))
+                        .attr("y1", yScale(startTemp))
+                        .attr("x2", xScale(latestYear))
+                        .attr("y2", yScale(endTemp))
+                        .attr("class", "trend-line")
+                        .attr("stroke-dasharray", "5,5");
+                    
+                    const modernStart = 1970;
+                    const modernEnd = latestYear;
+                    const modernStartTemp = shortTerm * (modernStart - 1970) / 10;
+                    const modernEndTemp = shortTerm * (modernEnd - 1970) / 10;
+                    
+                    mainGroup.append("line")
+                        .attr("x1", xScale(modernStart))
+                        .attr("y1", yScale(modernStartTemp))
+                        .attr("x2", xScale(modernEnd))
+                        .attr("y2", yScale(modernEndTemp))
+                        .attr("class", "recent-trend-line");
+                    
+                    const longLabel = `Long-term: ${longTerm.toFixed(2)}°C/decade`;
+                    mainGroup.append("text")
+                        .attr("class", "trend-label")
+                        .attr("x", xScale(1950))
+                        .attr("y", yScale(endTemp) - 20)
+                        .attr("text-anchor", "middle")
+                        .text(longLabel);
+                    
+                    const recentLabel = `Recent: ${shortTerm.toFixed(2)}°C/decade`;
+                    mainGroup.append("text")
+                        .attr("class", "trend-label")
+                        .attr("x", xScale(1995))
+                        .attr("y", yScale(modernEndTemp) - 40)
+                        .attr("text-anchor", "middle")
+                        .text(recentLabel);
+                    
+                } else {
+                    const startTemp = shortTerm * (earliestYear - 1970) / 10;
+                    const endTemp = shortTerm * (latestYear - 1970) / 10;
+                    
+                    mainGroup.append("line")
+                        .attr("x1", xScale(earliestYear))
+                        .attr("y1", yScale(startTemp))
+                        .attr("x2", xScale(latestYear))
+                        .attr("y2", yScale(endTemp))
+                        .attr("class", "recent-trend-line");
+                    
+                    const trendLabel = `Warming trend: ${shortTerm.toFixed(2)}°C/decade`;
+                    mainGroup.append("text")
+                        .attr("class", "trend-label")
+                        .attr("x", xScale(1995))
+                        .attr("y", yScale(endTemp) - 20)
+                        .attr("text-anchor", "middle")
+                        .text(trendLabel);
+                }
+            }
+            
+            const dots = mainGroup.selectAll(".data-point")
+                .data(dataToShow)
+                .enter()
+                .append("circle")
+                .attr("class", d => 
+                    `data-point ${activePa !== 1 ? 'interactive' : ''}`)
+                .attr("cx", d => xScale(d.yr))
+                .attr("cy", d => yScale(d.temp))
+                .attr("r", 4)
+                .attr("fill", d => d.temp > 0 ? "#e74c3c" : "#3498db")
+                .attr("opacity", 0);
+            
+            dots.transition()
+                .delay((d, i) => i * 5)
+                .duration(500)
+                .attr("opacity", 0.85);
+            
+            if (activePa !== 1) {
+                const infoBox = d3.select("#tooltip");
+                
+                dots.on("mouseover", function(event, d) {
+                        const celVal = d.celsiusVal;
+                        const fahVal = d.fahrenheitVal;
+                        
+                        const boxX = event.pageX + 20;
+                        const boxY = event.pageY - 100;
+                        
+                        infoBox
+                            .html(`
+                                <h3>${d.yr} Temperature Anomaly</h3>
+                                <p><strong>Celsius:</strong> ${celVal > 0 ? '+' : ''}${celVal.toFixed(2)}°C</p>
+                                <p><strong>Fahrenheit:</strong> ${fahVal > 0 ? '+' : ''}${fahVal.toFixed(2)}°F</p>
+                            `)
+                            .style("left", boxX + "px")
+                            .style("top", boxY + "px")
+                            .transition()
+                            .duration(200)
+                            .style("opacity", 1);
+                        
+                        d3.select(this)
+                            .attr("r", 6)
+                            .attr("stroke", "#333")
+                            .attr("stroke-width", 2);
+                    })
+                    .on("mouseout", function() {
+                        infoBox.transition()
+                            .duration(200)
+                            .style("opacity", 0);
+                        
+                        d3.select(this)
+                            .attr("r", 4)
+                            .attr("stroke", "none");
+                    });
+            }
+        };
+        
+        const refreshDisp = () => {
+            const scene = sceneInfo[activePa];
+            
+            document.getElementById("sceneTitle").textContent = scene.headline;
+            document.getElementById("sceneDescription").textContent = scene.text;
+            
+            document.getElementById("pageIndicator").textContent = `Page ${activePa} of ${numScenes}`;
+            document.getElementById("prevBtn").disabled = activePa === 1;
+            document.getElementById("nextBtn").disabled = activePa === numScenes;
+            
+            setTimeout(drawVis, 100);
+            
+            window.scrollTo(0, 0);
+        };
+        
+        const nextP = () => {
+            if (activePa < numScenes) {
+                activePa++;
+                refreshDisp();
+            }
+        };
+        
+        const prevP = () => {
+            if (activePa > 1) {
+                activePa--;
+                refreshDisp();
+            }
+        };
+        
+        const setButtons = () => {
+            document.getElementById("nextBtn").addEventListener("click", nextP);
+            document.getElementById("prevBtn").addEventListener("click", prevP);
+        };
+        
+        startup();
+    </script>
+</body>
+</html>
